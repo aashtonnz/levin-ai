@@ -16,13 +16,16 @@ Standing priorities:
 ## Next (in order, at most about 10)
 - T-4: Gate: does steering through discovered parts still beat retraining at scale? If no: rethink part-finding before anything else.
 - T-2: Part-quality check: redo part-finding when search through the parts cannot reach the examples. Covers R-3.
-- T-5: Literature check (started 2026-11-24) and choice of one real-task pilot. Covers R-4.
+- T-5: Literature check (first pass done: docs/literature.md); the real-task pilot is now M-2. Covers R-4.
 - T-6: Fresh-eyes review of the results before any write-up.
 - T-7: Short write-up: method, results, failures, comparison with existing work.
 
 ## Planned (after Next, by phase)
-Real task:
-- T-10: Real-task pilot, chosen in T-5.
+Long-term milestones (see PLAN.md; each only if the previous holds up):
+- T-12: M-1 biology testbed: reproduce a bioelectric finding in simulation; ask a developmental biologist for comment.
+- T-13: M-2 simulated robot that discovers its parts and is redirected by search, against fine-tuning, LoRA and steering vectors.
+- T-14: M-3 small multi-skill model: discoverable modules, redirection without forgetting, refusal behaviour kept.
+- T-15: M-4 share tissue control-point predictions with a bioelectric lab.
 
 ## Later / ideas
 - Revisit memory and switch-like units with the discovered-parts setup.
