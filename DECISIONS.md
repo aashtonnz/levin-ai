@@ -2,6 +2,7 @@
 
 Newest first. Each line: date, ID and name, what was decided and why.
 
+- 2026-11-24. D-12: Develop part-finding on one dataset, test on held-out worlds. Choosing the best method on the same data it is scored on would overfit; criteria are fixed before testing (PLAN.md, T-11).
 - 2026-11-24. D-11: Run scale-up conditions in three lanes. Three runs at a time share one GPU, since each alone leaves most of it idle; all six at once ran out of memory on a 15 GB T4. Results are unaffected.
 - 2026-11-24. D-10: Scale-up pass criteria, fixed before running. A condition is valid if steering through true parts reaches at least 80%; it passes if steering through discovered parts is within 10 points of true parts. Gradient-tuned codes are reported but not a criterion, since in this setting they act on the same good panel; the comparison with retraining is rerun separately on the larger grid with known parts.
 - 2026-11-24. D-9: Restart seeds that fail to learn. After training, a seed whose held-out error is more than 10× the median seed is retrained from a new start and the better version kept, the same rule for every panel; occasional seeds never learn, and this is detectable without labels.

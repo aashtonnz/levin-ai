@@ -10,6 +10,17 @@ Change one thing at a time from the current setup (3×3 tissues of 5×5 cells, 4
 - Shift rule (each tissue shows a neighbour's setting), so search must handle interactions.
 Measure for each: parts found and match to true tissues, steering success through discovered and true parts, retraining and prompt-tuning on the same examples, and trial runs used by search. Pass criteria to fix before running: steering through discovered parts within 10 points of true parts, and at least 30 points above the best baseline.
 
+## T-11: Better part-finding (started 2026-11-24)
+Scale-up so far: with irregular tissue shapes, steering through true parts reached 99% but through discovered parts
+only 51%. Part-finding is the bottleneck. Approach, chosen to avoid tuning to one dataset:
+- Methods may not use the true tissues; those are only for scoring. Prefer self-checks the system could really do.
+- Development data: phase-1 couplings from the irregular run (world seed 0, 8 seeds).
+- Held-out test data, used once, without changes to the method: new irregular worlds (world seeds 1 and 2), the
+  square base world, and the large and combined worlds from the scale-up.
+- Criteria, fixed before testing: on held-out data, the mean match to true tissues (adjusted Rand index) improves by
+  at least 0.10 over the current spectral method, and no condition gets worse by more than 0.03. Then one full run
+  on a held-out irregular world: steering through discovered parts within 10 points of true parts.
+
 ## T-4: Gate after scale-up
 If discovered-part steering holds up, move to the part-quality check and the real-task pilot. If it does not, find which change broke it (size, shape, options or interaction) and rethink part-finding or search for that case before going further.
 

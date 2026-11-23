@@ -35,6 +35,7 @@ ap.add_argument("--options", type=int, default=4, help="motif options per tissue
 ap.add_argument("--rule", choices=["independent", "shift"], default="independent",
                 help="shift: each tissue shows the motif chosen for its left neighbour")
 ap.add_argument("--world-seed", type=int, default=0)
+ap.add_argument("--phase1-only", action="store_true", help="stop after phase 1 (saves couplings.npz)")
 args = ap.parse_args()
 if args.quick: args.seeds, args.iters1, args.iters2 = 2, 6, 6
 
@@ -460,6 +461,8 @@ if __name__ == "__main__":
         gg = torch.randint(0, K, (M, 32, N), device=DEV); tt = target(gg)
         a1, _ = check(p1, grid, encode(p1, grid, tt, noise=False), tt)
     np.savez(f"{args.out}/couplings.npz", ch=ch, cv=cv)
+    if args.phase1_only:
+        print("phase 1 only: couplings saved", flush=True); raise SystemExit
     print(f"  old part-finder: match {np.mean([x['ari_old_method'] for x in ph1]):.2f}, parts {[x['parts_old_method'] for x in ph1]}", flush=True)
     disc = Parts(torch.tensor(pm)); cfix1 = couplings(p1)
     print(f"  coupling on hidden boundaries {np.mean([x['boundary'] for x in ph1]):.2f}, inside "
