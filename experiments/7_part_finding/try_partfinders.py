@@ -85,8 +85,25 @@ def m_spectral_merge(ch, cv, k):   # current method, then merge parts whose bord
     return merge_by_borders(m_spectral(ch, cv, k), ch, cv, lambda bm, within, allb: bm > (within + allb) / 2)
 
 
+def m_mean_coupling(ch, cv, k):    # combine copies: average the coupling maps of all trained copies, then spectral
+    return spectral_parts(CH.mean(0), CVV.mean(0), power=2, seed=0, kmax=min(H * W // 8, 60))[0].flatten()
+
+
+_CO = {}
+def m_coassoc(ch, cv, k):          # combine copies: how often two cells share a part across copies, then cluster that
+    if "lab" not in _CO:
+        labs = np.stack([m_spectral(CH[j], CVV[j], j) for j in range(CH.shape[0])])
+        same = lambda a, b: (labs[:, a] == labs[:, b]).mean(0)
+        L = np.arange(H * W).reshape(H, W)
+        ch2 = same(L[:, :-1].ravel(), L[:, 1:].ravel()).reshape(H, W - 1)
+        cv2 = same(L[:-1, :].ravel(), L[1:, :].ravel()).reshape(H - 1, W)
+        _CO["lab"] = spectral_parts(ch2 * 0.9 + 0.05, cv2 * 0.9 + 0.05, power=2, seed=0, kmax=min(H * W // 8, 60))[0].flatten()
+    return _CO["lab"]
+
+
 METHODS = {"spectral (current)": m_spectral, "modularity-chosen size": m_modularity,
-           "spectral + merge": m_spectral_merge, "over-segment + merge": m_over_merge}
+           "spectral + merge": m_spectral_merge, "over-segment + merge": m_over_merge,
+           "average of copies": m_mean_coupling, "agreement of copies": m_coassoc}
 print(f"world: side {H}, {N} tissues, {'irregular' if args.irregular else 'square'}, world seed {args.world_seed}; "
       f"{CH.shape[0]} seeds from {run_dir}")
 for name, f in METHODS.items():
