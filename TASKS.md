@@ -8,7 +8,7 @@ Standing priorities:
 - Keep GPU spend low: smoke-test on CPU first, disconnect the Colab runtime after every run.
 
 ## Doing (at most 3)
-- T-11: Better part-finding for irregular tissues, developed on one dataset and tested on held-out worlds (see PLAN.md). Covers R-1 and R-3.
+- T-11: Better part-finding. Averaging copies failed its fixed criterion on held-out worlds (+0.06 vs +0.10 needed) though it helped in 4 of 5; see experiments/7_part_finding/results_development.md. Next idea: a self-check using steering on the training examples.
 - T-3: Scale-up test. Code ready, smoke-tested and pushed; GPU run blocked on 2026-11-24 because Colab had no free GPU. Next: start `run_all.sh` when one is available.
 
 ## Waiting on you

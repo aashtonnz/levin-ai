@@ -24,6 +24,15 @@ these experiments already train.
 | Irregular, world seed 1 | 0.63 (parts 25, 10, 10, 9, 10, 9, 9, 9) | 0.75 (9 in 7 of 8 copies) | +0.12 |
 | Irregular, world seed 2 | 0.69 (parts 14, 9, 9, 9, 9, 9, 9, 9) | 0.75 (9 in all 8) | +0.06 |
 | Square, world seed 0 | 0.90 (9 in all 8) | **1.00** (9 in all 8) | +0.10 |
+| Large, 25 square tissues | 0.83 (parts 18–25) | 0.89 (24 in all 8; true 25) | +0.06 |
+| Combined: 25 irregular, 8 options, shift | 0.49 (parts 8–40) | 0.47 (13 in all 8) | −0.02 |
 
-Pending: large world, combined world. Criteria (PLAN.md, T-11): mean improvement at least 0.10, no
-condition worse by more than 0.03.
+**Verdict against the criteria fixed in advance (PLAN.md, T-11): FAIL.**
+- Mean improvement +0.06 (needed +0.10). Without the combined world, where training itself failed (see the
+  8-option result), it would be +0.085: still short.
+- No condition got worse by more than 0.03: met.
+
+Reading: averaging copies helps consistently (four of five held-out worlds, never clearly worse) and is exact on
+the square world, but the gain is smaller than the bar set. It is a useful improvement, not the fix. The combined
+world shows a separate problem: when the model cannot learn the task (8 options), its couplings carry little
+information about the parts, and no part-finder can recover them.
