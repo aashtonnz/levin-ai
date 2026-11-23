@@ -35,6 +35,8 @@ ap.add_argument("--options", type=int, default=4, help="motif options per tissue
 ap.add_argument("--rule", choices=["independent", "shift"], default="independent",
                 help="shift: each tissue shows the motif chosen for its left neighbour")
 ap.add_argument("--world-seed", type=int, default=0)
+ap.add_argument("--partfinder", choices=["spectral", "mean-of-copies"], default="spectral",
+                help="mean-of-copies: average the coupling maps of all trained copies before spectral clustering")
 ap.add_argument("--phase1-only", action="store_true", help="stop after phase 1 (saves couplings.npz)")
 args = ap.parse_args()
 if args.quick: args.seeds, args.iters1, args.iters2 = 2, 6, 6
@@ -451,7 +453,11 @@ if __name__ == "__main__":
     true_lab = tissue.cpu().numpy().flatten(); pm = np.zeros((M, H, W), dtype=np.int64); ph1 = []
     for k in range(M):
         old_lab, raw = discover(ch[k], cv[k], min_part=args.min_part)
-        lab, _k = spectral_parts(ch[k], cv[k], power=2, seed=k, kmax=min(H * W // 8, 60)); pm[k] = lab
+        if args.partfinder == "mean-of-copies":   # same partition for every copy, from the averaged couplings
+            lab, _k = spectral_parts(ch.mean(0), cv.mean(0), power=2, seed=0, kmax=min(H * W // 8, 60))
+        else:
+            lab, _k = spectral_parts(ch[k], cv[k], power=2, seed=k, kmax=min(H * W // 8, 60))
+        pm[k] = lab
         ph1.append({"boundary": float(np.concatenate([ch[k][bh], cv[k][bv]]).mean()),
                     "interior": float(np.concatenate([ch[k][~bh], cv[k][~bv]]).mean()),
                     "ari_raw": ari(raw.flatten(), true_lab), "parts_raw": int(raw.max() + 1),
