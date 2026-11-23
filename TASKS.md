@@ -9,7 +9,7 @@ Standing priorities:
 
 ## Doing (at most 3)
 - T-11: Better part-finding. Averaging copies failed its fixed criterion on held-out worlds (+0.06 vs +0.10 needed) though it helped in 4 of 5; see experiments/7_part_finding/results_development.md. Next idea: a self-check using steering on the training examples.
-- T-3: Scale-up test. Code ready, smoke-tested and pushed; GPU run blocked on 2026-11-24 because Colab had no free GPU. Next: start `run_all.sh` when one is available.
+- T-16: Fix training with 8 options (codes = options leaves no spare codes). CPU test with 16 codes running; if it trains and true-part steering reaches 80%+, rerun the 8-option and combined conditions on GPU.
 
 ## Waiting on you
 
@@ -33,6 +33,7 @@ Long-term milestones (see PLAN.md; each only if the previous holds up):
 - Hierarchical parts (parts of parts) with goals at each level.
 
 ## Done (last two weeks, newest first)
+- T-3: Scale-up finished. With true parts, steering holds at 99–100% (irregular shapes, 25 tissues, real interactions; retraining and prompt tuning 0%). Discovered parts fail on irregular (51%) and big (16%) worlds; 8-option and combined runs invalid (training failed). [final](experiments/6_scale_up/results/final.md) 2026-11-24.
 - T-9: MIT licence added. 2026-11-24.
 - T-8: Next step chosen: scale-up first; repository made public so Colab can clone it. 2026-11-24.
 - T-1: Training reliability fixed: best-version keeping plus restarts; true-part steering 100% on 8 of 8 seeds, discovered parts 88%. [run 8](experiments/5_discovered_parts/results/run8.md) 2026-11-24.
