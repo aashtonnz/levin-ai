@@ -8,7 +8,7 @@ Standing priorities:
 - Keep GPU spend low: smoke-test on CPU first, disconnect the Colab runtime after every run.
 
 ## Doing (at most 3)
-- T-3: Scale-up test. Code ready and smoke-tested on CPU; next: GPU run of all conditions side by side.
+- T-3: Scale-up test. Code ready, smoke-tested and pushed; GPU run blocked on 2026-11-24 because Colab had no free GPU. Next: start `run_all.sh` when one is available.
 
 ## Waiting on you
 - T-9: Choose a licence for the repository, if it will be public. Suggested: MIT. Raised 2026-11-24.
