@@ -15,4 +15,4 @@ base setup (15×15 cells, 9 square tissues, 4 options, independent rule), plus o
 Pass criteria, fixed before running: valid if steering through true parts reaches at least 80%; passes if steering
 through discovered parts is within 10 points of true parts.
 
-`run_all.sh` starts every condition at once on one GPU and writes a log per condition to `logs/`.
+`run_all.sh` runs the conditions in three lanes side by side on one GPU (one run at a time per lane, so memory fits on a T4) and writes a log per condition to `logs/`.
