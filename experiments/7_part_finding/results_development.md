@@ -16,3 +16,13 @@ Changing how cells are grouped did not help; combining evidence across the indep
 "Average of copies" (average the coupling maps of all copies, then spectral clustering) is now fixed and will be
 judged on held-out worlds against the criteria in PLAN.md (T-11). Its cost: it needs several trained copies, which
 these experiments already train.
+
+## Held-out test (method fixed beforehand), 2026-11-24
+
+| World (not used in development) | Spectral (current) | Average of copies | Change |
+|---|---|---|---|
+| Irregular, world seed 1 | 0.63 (parts 25, 10, 10, 9, 10, 9, 9, 9) | 0.75 (9 in 7 of 8 copies) | +0.12 |
+| Irregular, world seed 2 | 0.69 (parts 14, 9, 9, 9, 9, 9, 9, 9) | 0.75 (9 in all 8) | +0.06 |
+
+Pending: square world, large world, combined world. Criteria (PLAN.md, T-11): mean improvement at least 0.10, no
+condition worse by more than 0.03.
