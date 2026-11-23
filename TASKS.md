@@ -8,14 +8,12 @@ Standing priorities:
 - Keep GPU spend low: smoke-test on CPU first, disconnect the Colab runtime after every run.
 
 ## Doing (at most 3)
-- (none)
+- T-3: Scale-up test. Code ready and smoke-tested on CPU; next: GPU run of all conditions side by side.
 
 ## Waiting on you
-- T-8: Choose the next step: the part-quality check (T-2) or the scale-up test (T-3). Suggested: scale-up first, since it decides whether the idea is worth pursuing. Raised 2026-11-24.
 - T-9: Choose a licence for the repository, if it will be public. Suggested: MIT. Raised 2026-11-24.
 
 ## Next (in order, at most about 10)
-- T-3: Scale-up test: larger grid, irregular tissues, more options per part, shift rule. Covers R-1 and R-2.
 - T-4: Gate: does steering through discovered parts still beat retraining at scale? If no: rethink part-finding before anything else.
 - T-2: Part-quality check: redo part-finding when search through the parts cannot reach the examples. Covers R-3.
 - T-5: Literature check and choice of one real-task pilot. Covers R-4.
@@ -32,6 +30,7 @@ Real task:
 - Hierarchical parts (parts of parts) with goals at each level.
 
 ## Done (last two weeks, newest first)
+- T-8: Next step chosen: scale-up first; repository made public so Colab can clone it. 2026-11-24.
 - T-1: Training reliability fixed: best-version keeping plus restarts; true-part steering 100% on 8 of 8 seeds, discovered parts 88%. [run 8](experiments/5_discovered_parts/results/run8.md) 2026-11-24.
 - Spectral part-finding: 9 parts in 7–8 of 8 seeds, steering through discovered parts matches true parts. [run 6](experiments/5_discovered_parts/results/run6.md) 2026-11-24.
 - 2D test passed its fixed criteria for both rules (search 98% and 100%, retraining 0–2%). [results](experiments/3_grid_2d/results/gpu_runs.md) 2026-11-23.
