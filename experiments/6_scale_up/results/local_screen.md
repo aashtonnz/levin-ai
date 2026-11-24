@@ -34,3 +34,17 @@ Reading: no variant passes. Noise around 0.6 is the best tried (search 56–75% 
 spread is large, so 2-seed screens are only a rough guide here. Random codes move search from 4% to roughly
 50–75% but not reliably to 80%. Next ideas: randomise only one or two squares per example (gentler than a fixed
 rate), or train with the search procedure itself in the loop.
+
+## Gentler version: randomise exactly k squares per example (small squares, 4 seeds, world 0)
+
+| Variant | Encoder | Search (probe influence) | Search (own cells) | Gradient codes | Screen |
+|---|---|---|---|---|---|
+| k = 1 | 100% [100, 100, 100, 100] | 4% [0, 0, 3, 12] | 1% [0, 3, 0, 0] | 18% | FAIL |
+| k = 2 | 99% [100, 97, 100, 100] | 7% [9, 6, 3, 9] | 2% [3, 0, 0, 3] | 31% | FAIL |
+| k = 4 | 99% [100, 100, 97, 100] | 28% [22, 38, 6, 47] | 13% [0, 31, 9, 12] | 66% | FAIL |
+| 60% of squares | 71% [59, 50, 88, 78] | 62% [59, 28, 72, 88] | 66% [69, 31, 75, 91] | 55% | FAIL |
+
+Reading: no variant passes. Across all random-code runs there is a clear trade-off: the more squares are randomised
+in training, the better search works and the worse the one-shot encoder works (k=1: 100% / 4%; k=4: 99% / 28%;
+60%: 71% / 66%). No setting gets both above the bar, so this approach on its own does not close the gap.
+Gradient-tuned codes rise with noise too (18% -> 66% at k=4). Next idea: train with search in the loop.
