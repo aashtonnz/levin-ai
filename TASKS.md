@@ -12,7 +12,7 @@ Standing priorities:
 - T-11: Better part-finding. Averaging copies failed its fixed criterion on held-out worlds (+0.06 vs +0.10 needed) though it helped in 4 of 5; see experiments/7_part_finding/results_development.md. Next idea: a self-check using steering on the training examples.
 
 ## Waiting on you
-- T-19: choose how to run the GPU screen (Colab as before, or a cloud GPU reached from this session); options and costs given in the conversation. Suggested: Colab. Raised 2026-11-24.
+- T-19: run the GPU screen in Colab (`bash run_search.sh screen` on branch claude/eager-mayer-ptq15n; cells given in the conversation) and paste the three summaries back. Colab chosen 2026-11-24; this session cannot reach a browser. Raised 2026-11-24.
 
 ## Next (in order, at most about 10)
 - T-16: Fix training with 8 options. Not fixed by 16 codes (7%), longer training (23% at 6000 steps; 20000 steps with a high learning rate peaked at step 4000 and ended at 8%), a bigger network (0%) or a 4-then-8 curriculum (5%); [screen8](experiments/6_scale_up/results/screen8.md), [long8](experiments/6_scale_up/results/long8.md). Points to a design limit. Next to try: more update steps, or several codes per part. Parked; lower priority than T-11 and T-19.
