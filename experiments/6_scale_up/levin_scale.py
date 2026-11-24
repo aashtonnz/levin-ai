@@ -49,6 +49,14 @@ ap.add_argument("--code-noise", type=float, default=0.0, help="training only: ea
                 "locally whatever its neighbours' codes are")
 ap.add_argument("--code-noise-k", type=int, default=0, help="training only: randomise exactly this many parts' codes per "
                 "example (gentler alternative to --code-noise), ignoring the error on their cells")
+ap.add_argument("--search-train", type=float, default=0.0, help="training only (T-19): this fraction of each batch "
+                "gets its codes from a short square-by-square search with the current weights (no gradient through "
+                "the search), and the model is trained so those codes draw the target; the rest use encoder codes")
+ap.add_argument("--search-start", type=float, default=0.3, help="fraction of training (encoder codes only) before "
+                "search in the loop starts")
+ap.add_argument("--search-sweeps", type=int, default=2, help="sweeps of the training-time search (test search uses 4)")
+ap.add_argument("--search-distill", type=float, default=1.0, help="weight of a loss training the encoder to predict "
+                "the searched codes (so encoder and search agree)")
 ap.add_argument("--phase1-only", action="store_true", help="stop after phase 1 (saves couplings.npz)")
 args = ap.parse_args()
 if args.quick: args.seeds, args.iters1, args.iters2 = 2, 6, 6
@@ -255,7 +263,7 @@ def couplings(p, fixed=None):
     return c * (1 - BORDER)
 
 
-def encode(p, parts, tgt, tau=1.0, noise=True, hard=True):
+def encode(p, parts, tgt, tau=1.0, noise=True, hard=True, logits_only=False):
     """Each part reads a 7x7 window of the target centred on its own centre, then a small MLP picks its code.
     Identical for every panel."""
     Mn, B = tgt.shape[:2]
@@ -264,6 +272,7 @@ def encode(p, parts, tgt, tau=1.0, noise=True, hard=True):
     x = win.gather(3, idx).permute(0, 1, 3, 2)                                          # (M,B,P,49)
     h = F.relu(torch.einsum("mbpi,mji->mbpj", x, p["e1"]) + p["e2b"][:, None, None])
     logits = torch.einsum("mbpj,mvj->mbpv", h, p["e3"]) + p["eb"][:, None, None]
+    if logits_only: return logits
     if noise: logits = logits - torch.log(-torch.log(torch.rand_like(logits).clamp(1e-9, 1)))
     soft = F.softmax(logits / tau, -1)
     return soft + (F.one_hot(soft.argmax(-1), V).float() - soft).detach() if hard else soft
@@ -308,11 +317,33 @@ def rollout(p, parts, codes, steps=T, desired=None, dmg_prob=0.0, grad=False, cf
 
 
 @torch.no_grad()
+def train_search(p, parts, tgt, sweeps, cfix=None):
+    """Square-by-square search used inside training (T-19). Same procedure as the test's 'own cells' search
+    (start from code 0 everywhere; for each colour group in turn, try every code and keep, for each part, the one
+    with the lowest error over that part's own cells), but all codes of a group are tried in one batched run."""
+    Mn, B = tgt.shape[:2]; P = parts.P
+    codes = torch.zeros(Mn, B, P, dtype=torch.long, device=DEV)
+    tv = tgt[:, None].expand(Mn, V, B, H, W).reshape(Mn, V * B, H, W)
+    vv = torch.arange(V, device=DEV)[None, :, None, None]
+    for _ in range(sweeps):
+        for col in range(parts.ncol):
+            sel = (parts.colour == col)[:, None, None, :]                                # (M,1,1,P)
+            trial = torch.where(sel, vv, codes[:, None])                                 # (M,V,B,P)
+            s, _ = rollout(p, parts, F.one_hot(trial.reshape(Mn, V * B, P), V).float(), cfix=cfix)
+            e = parts.part_err(s[:, :, 0].clamp(0, 1), tv).reshape(Mn, V, B, P)
+            codes = torch.where(sel[:, 0], e.argmin(1), codes)
+    return codes
+
+
+@torch.no_grad()
 def val_loss(p, parts, cfix=None):
-    """Per-seed error on a fixed held-out batch (encoder codes, no noise)."""
+    """Per-seed error on a fixed held-out batch (encoder codes, no noise). With search in the loop (T-19), the codes
+    come from the training-time search instead, since search is what is being trained and tested."""
     st = torch.get_rng_state(); torch.manual_seed(12345)
     g = torch.randint(0, K, (M, 32, N), device=DEV); tgt = target(g)
-    s = torch.zeros(M, 32, C, H, W, device=DEV); u = parts.field(encode(p, parts, tgt, noise=False)); c = couplings(p, cfix)
+    vc = (F.one_hot(train_search(p, parts, tgt, args.search_sweeps, cfix), V).float() if args.search_train > 0
+          else encode(p, parts, tgt, noise=False))
+    s = torch.zeros(M, 32, C, H, W, device=DEV); u = parts.field(vc); c = couplings(p, cfix)
     for t in range(T): s = step(p, s, u, c)
     torch.set_rng_state(st)
     return ((s[:, :, 0].clamp(0, 1) - tgt) ** 2).mean((1, 2, 3))           # (M,)
@@ -338,10 +369,22 @@ def train(p, parts, iters, anneal_cost=0.0, cfix=None, tag="", B=16, keep_best=F
             rnd = F.one_hot(torch.randint(0, V, codes.shape[:3], device=DEV), V).float()
             codes = torch.where(pert[..., None], rnd, codes)
             wm = 1 - torch.einsum("mbp,mphw->mbhw", pert.float(), parts.mask).clamp(max=1)
+        s_start = int(args.search_start * iters); distill = 0.0
+        if args.search_train > 0 and it == s_start and keep_best:   # judge versions only once search is in the loop
+            best_v.fill_(float("inf"))
+        if args.search_train > 0 and it >= s_start:   # T-19: codes for the first nb examples come from search
+            nb = max(1, round(args.search_train * B))
+            sc = train_search(p, parts, tgt[:, :nb], args.search_sweeps, cfix)               # (M,nb,P), no gradient
+            codes = torch.cat([F.one_hot(sc, V).float(), codes[:, nb:]], 1)
+            if args.search_distill > 0:   # encoder learns to predict the searched codes, on parts that exist
+                lg = encode(p, parts, tgt[:, :nb], logits_only=True)
+                ce = F.cross_entropy(lg.reshape(-1, V), sc.reshape(-1), reduction="none").reshape(sc.shape)
+                ex = parts.exists[:, None].float()
+                distill = args.search_distill * ((ce * ex).sum((1, 2)) / (ex.sum((1, 2)) * nb)).sum()
         _, loss = rollout(p, parts, codes, T, tgt, dmg_prob=0.6, grad=True, cfix=cfix, wmask=wm)
         ramp = min(1.0, max(0.0, (it / iters - 0.3) / 0.4))                 # 0 until 30%, full by 70%
         cost = anneal_cost * ramp * couplings(p).mean((1, 2, 3)).sum() if "ch" in p else 0.0
-        opt.zero_grad(); (loss + cost).backward(); torch.nn.utils.clip_grad_norm_(p.values(), M); opt.step(); sched.step()
+        opt.zero_grad(); (loss + distill + cost).backward(); torch.nn.utils.clip_grad_norm_(p.values(), M); opt.step(); sched.step()
         if keep_best and (it % 100 == 0 or it == iters - 1) and it > 0:
             v = val_loss(p, parts, cfix); imp = v < best_v; best_v = torch.where(imp, v, best_v)
             for k_ in p: best_p[k_][imp] = p[k_].detach()[imp]
@@ -353,7 +396,8 @@ def train(p, parts, iters, anneal_cost=0.0, cfix=None, tag="", B=16, keep_best=F
             print(f"  [{tag}] it {it:5d} ACCURACY (encoder, current weights) per seed {[round(100 * float(x)) for x in acc]}", flush=True)
         if it % 200 == 0 or it == iters - 1:
             extra = f" | held-out per seed {[round(x, 4) for x in best_v.tolist()]}" if keep_best and it > 0 else ""
-            print(f"  [{tag}] it {it:5d} recon/model {loss.item() / M:.4f} mean coupling "
+            dl = f" distill/model {float(distill.detach() if torch.is_tensor(distill) else distill) / M:.3f}" if args.search_train > 0 else ""
+            print(f"  [{tag}] it {it:5d} recon/model {loss.item() / M:.4f}{dl} mean coupling "
                   f"{couplings(p, cfix).mean().item():.2f} ({time.time() - t0:.0f}s){extra}", flush=True)
     return best_p if keep_best else {k: v.detach() for k, v in p.items()}
 
@@ -517,7 +561,9 @@ if __name__ == "__main__":
         best = max(100 * r[S][0].mean(), 100 * r["search (each part judged by its own cells)"][0].mean())
         L = [f"# {'Nested squares ' + args.hier if args.hier else 'True parts'} only ({M} seeds, {DEV}); {parts.P} parts", "",
              f"World: side {H}, {N} tissues, {'irregular' if args.irregular else 'square'}, {K} options, {args.rule} rule; "
-             f"codes {V}, hidden {HID}, iters2 {args.iters2}, curriculum {args.curriculum}, code noise {args.code_noise}, k {args.code_noise_k}.", "",
+             f"codes {V}, hidden {HID}, iters2 {args.iters2}, curriculum {args.curriculum}, code noise {args.code_noise}, k {args.code_noise_k}; "
+             f"search in training: fraction {args.search_train}, from {args.search_start}, sweeps {args.search_sweeps}, "
+             f"distill {args.search_distill}.", "",
              f"- Held-out error per seed: {[round(x, 4) for x in v.tolist()]}",
              f"- Encoder: {100 * r[E][0].mean():.0f}% per seed {[round(100 * float(x)) for x in r[E][0]]}",
              f"- Search (probe influence): {100 * r[S][0].mean():.0f}% per seed {[round(100 * float(x)) for x in r[S][0]]}",

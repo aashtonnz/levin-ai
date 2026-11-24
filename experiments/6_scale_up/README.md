@@ -16,3 +16,10 @@ Pass criteria, fixed before running: valid if steering through true parts reache
 through discovered parts is within 10 points of true parts.
 
 `run_all.sh` runs the conditions in three lanes side by side on one GPU (one run at a time per lane, so memory fits on a T4) and writes a log per condition to `logs/`.
+
+## Search in the loop (T-19)
+
+`run_search.sh` trains with a short square-by-square search inside training (`--search-train`, `--search-start`,
+`--search-sweeps`, `--search-distill`), so that codes found by search are the ones the model learns to use. Its
+header fixes the pass criteria: `bash run_search.sh screen` first, then `bash run_search.sh full VARIANT` with the
+variant the screen rule picks. With these options off, the script behaves exactly as before.

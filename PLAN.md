@@ -21,6 +21,18 @@ only 51%. Part-finding is the bottleneck. Approach, chosen to avoid tuning to on
   at least 0.10 over the current spectral method, and no condition gets worse by more than 0.03. Then one full run
   on a held-out irregular world: steering through discovered parts within 10 points of true parts.
 
+## T-19: Train with search in the loop (started 2026-11-24)
+T-17 and T-18 showed that square codes learned through the encoder are used jointly, so square-by-square search
+fails, and random codes in training trade search off against the encoder. Here the search itself is put into
+training: after 30% of training, half of each batch gets its codes from a short square-by-square search with the
+current weights (the same procedure as the test's own-cells search, 2 sweeps instead of 4, no gradient through it),
+the model is trained so those codes draw the target, and the encoder is trained to predict the searched codes.
+Held-out checks for keeping each seed's best version use searched codes, counted only after search starts.
+Criteria (fixed in experiments/6_scale_up/run_search.sh before running): screen of three variants at 4 seeds on
+world 0, pass if best search >= 80%; the best passing variant then gets the T-17 criteria at 8 seeds: world 0
+best search >= 89%, world 1 >= 90% (true parts on world 1 got 100%). Encoder accuracy is reported, not a criterion.
+Cost: each training step after the start does about 5-12 times the work of a T-17 step.
+
 ## T-4: Gate after scale-up
 If discovered-part steering holds up, move to the part-quality check and the real-task pilot. If it does not, find which change broke it (size, shape, options or interaction) and rethink part-finding or search for that case before going further.
 
