@@ -9,13 +9,13 @@ Standing priorities:
 
 ## Doing (at most 3)
 - T-18: Make each square's code mean something locally (random codes during training). No setting passes: a clear trade-off between search (4% -> 66%) and the one-shot encoder (100% -> 71%) as more squares are randomised. [local_screen](experiments/6_scale_up/results/local_screen.md). Next idea: train with search in the loop.
-- T-17: Nested squares as parts (user's idea). Learns fully (error 0.0003) and one-shot encoder steers 100% on both worlds, but search fails (5–9%; criteria H1/H2 FAIL): codes are used jointly, not locally. [hier](experiments/6_scale_up/results/hier.md). Next: train so each square's code has a local meaning (random or one-at-a-time codes in training), then retest search.
 - T-11: Better part-finding. Averaging copies failed its fixed criterion on held-out worlds (+0.06 vs +0.10 needed) though it helped in 4 of 5; see experiments/7_part_finding/results_development.md. Next idea: a self-check using steering on the training examples.
-- T-16: Fix training with 8 options. Not fixed by 16 codes (7%), longer training (23% at 6000 steps; 20000 steps with a high learning rate peaked at step 4000 and ended at 8%), a bigger network (0%) or a 4-then-8 curriculum (5%); [screen8](experiments/6_scale_up/results/screen8.md), [long8](experiments/6_scale_up/results/long8.md). Points to a design limit. Next to try: more update steps, or several codes per part. Lower priority than T-11.
 
 ## Waiting on you
 
 ## Next (in order, at most about 10)
+- T-19: Train with search in the loop (nested or small squares): pick codes by a short square-by-square search during training and train so those codes draw the target. Fix criteria before running (T-17 criteria: world 0 >= 89%, world 1 within 10 points of true parts).
+- T-16: Fix training with 8 options. Not fixed by 16 codes (7%), longer training (23% at 6000 steps; 20000 steps with a high learning rate peaked at step 4000 and ended at 8%), a bigger network (0%) or a 4-then-8 curriculum (5%); [screen8](experiments/6_scale_up/results/screen8.md), [long8](experiments/6_scale_up/results/long8.md). Points to a design limit. Next to try: more update steps, or several codes per part. Parked; lower priority than T-11 and T-19.
 - T-4: Gate: does steering through discovered parts still beat retraining at scale? If no: rethink part-finding before anything else.
 - T-2: Part-quality check: redo part-finding when search through the parts cannot reach the examples. Covers R-3.
 - T-5: Literature check (first pass done: docs/literature.md); the real-task pilot is now M-2. Covers R-4.
@@ -32,9 +32,9 @@ Long-term milestones (see PLAN.md; each only if the previous holds up):
 ## Later / ideas
 - Revisit memory and switch-like units with the discovered-parts setup.
 - Add a minimal Colab notebook to the repository for one-click runs.
-- Hierarchical parts (parts of parts) with goals at each level.
 
 ## Done (last two weeks, newest first)
+- T-17: Nested squares as parts (user's idea). Learns fully (error 0.0003) and one-shot encoder steers 100% on both worlds, but search fails (5–9%; criteria H1/H2 FAIL): codes are used jointly, not locally. [hier](experiments/6_scale_up/results/hier.md). Follow-up in T-18. 2026-11-24.
 - T-3: Scale-up finished. With true parts, steering holds at 99–100% (irregular shapes, 25 tissues, real interactions; retraining and prompt tuning 0%). Discovered parts fail on irregular (51%) and big (16%) worlds; 8-option and combined runs invalid (training failed). [final](experiments/6_scale_up/results/final.md) 2026-11-24.
 - T-9: MIT licence added. 2026-11-24.
 - T-8: Next step chosen: scale-up first; repository made public so Colab can clone it. 2026-11-24.
