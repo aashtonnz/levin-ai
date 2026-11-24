@@ -8,6 +8,7 @@ Standing priorities:
 - Keep GPU spend low: smoke-test on CPU first, disconnect the Colab runtime after every run.
 
 ## Doing (at most 3)
+- T-17: Nested squares as parts (user's idea: squares within squares, like pixel resolution, so any region shape can be approximated). Every cell gets one code per level; search coarse to fine. Criteria fixed in `experiments/6_scale_up/run_hier.sh`. GPU run started 2026-11-24.
 - T-11: Better part-finding. Averaging copies failed its fixed criterion on held-out worlds (+0.06 vs +0.10 needed) though it helped in 4 of 5; see experiments/7_part_finding/results_development.md. Next idea: a self-check using steering on the training examples.
 - T-16: Fix training with 8 options. Not fixed by 16 codes (7%), longer training (23% at 6000 steps; 20000 steps with a high learning rate peaked at step 4000 and ended at 8%), a bigger network (0%) or a 4-then-8 curriculum (5%); [screen8](experiments/6_scale_up/results/screen8.md), [long8](experiments/6_scale_up/results/long8.md). Points to a design limit. Next to try: more update steps, or several codes per part. Lower priority than T-11.
 

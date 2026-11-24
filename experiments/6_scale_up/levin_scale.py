@@ -42,6 +42,8 @@ ap.add_argument("--hidden", type=int, default=64, help="hidden units of the per-
 ap.add_argument("--curriculum", action="store_true", help="train on 4 options for the first half, then all options")
 ap.add_argument("--lr-drops", default="0.5,0.8", help="fractions of training where the learning rate drops to 30%%")
 ap.add_argument("--eval-every", type=int, default=0, help="if >0, log encoder accuracy on fixed held-out patterns every N steps")
+ap.add_argument("--hier", default="", help="nested square grids instead of parts, e.g. 3,6 = 3x3 big squares each split "
+                "into 2x2 smaller ones; every cell gets one code per level (true-only mode with these parts)")
 ap.add_argument("--phase1-only", action="store_true", help="stop after phase 1 (saves couplings.npz)")
 args = ap.parse_args()
 if args.quick: args.seeds, args.iters1, args.iters2 = 2, 6, 6
@@ -119,7 +121,8 @@ def tissue_err(out, tgt):
 
 BORDER = torch.zeros(4, H, W, device=DEV)
 BORDER[0, :, 0] = 1; BORDER[1, :, -1] = 1; BORDER[2, 0, :] = 1; BORDER[3, -1, :] = 1
-PIN = 5 * C + V + 4 + 3          # +3: position cue within the cell's own part
+LEVELS = [int(x) for x in args.hier.split(",")] if args.hier else [0]
+PIN = 5 * C + V * len(LEVELS) + 4 + 3 * len(LEVELS)   # one code + position cue (3) per level of parts
 
 
 # ------------------------------------------------------------------ part maps
@@ -164,6 +167,29 @@ class Parts:
 
     def part_err(self, out, tgt):                 # (M,B,H,W) -> (M,B,P) mean error over each part's own cells
         return torch.einsum("mbhw,mphw->mbp", (out - tgt) ** 2, self.mask) / self.count[:, None]
+
+
+class HParts(Parts):
+    """Nested square grids: level l has n_l x n_l squares; every cell gets one code from its square at each level.
+    Parts are numbered level by level (coarsest first); search colours give coarse levels first."""
+    def __init__(self, sizes):
+        self.levels = []
+        for n in sizes:
+            g = torch.arange(H) * n // H; gx = torch.arange(W) * n // W
+            self.levels.append(Parts((g[:, None] * n + gx[None, :]).expand(M, H, W).clone()))
+        self.off = np.cumsum([0] + [lv.P for lv in self.levels]).tolist(); self.P = self.off[-1]
+        self.mask = torch.cat([lv.mask for lv in self.levels], 1); self.count = torch.cat([lv.count for lv in self.levels], 1)
+        self.exists = torch.cat([lv.exists for lv in self.levels], 1)
+        self.centre_idx = torch.cat([lv.centre_idx for lv in self.levels], 1)
+        cols, base = [], 0
+        for lv in self.levels: cols.append(lv.colour + base); base += lv.ncol
+        self.colour = torch.cat(cols, 1); self.ncol = base
+        self.pos = torch.cat([lv.pos for lv in self.levels], 1)
+
+    def field(self, codes):                       # codes (M,B,P,V) -> (M,B,V*L + 3L,H,W)
+        fs = [lv.field(codes[:, :, self.off[i]:self.off[i + 1]])[:, :, :V] for i, lv in enumerate(self.levels)]
+        Mn, B = codes.shape[:2]
+        return torch.cat(fs + [self.pos[:, None].expand(Mn, B, self.pos.shape[1], H, W)], 2)
 
 
 def grid_parts():
@@ -457,17 +483,29 @@ if __name__ == "__main__":
     torch.manual_seed(0); np.random.seed(0)
 
     if args.true_only:
-        parts = true_parts(); torch.manual_seed(1); np.random.seed(1)
-        p2 = train(init(1, "fixed"), parts, args.iters2, tag="true tissues", keep_best=True)
-        v = val_loss(p2, parts); r = steering(p2, parts, "true tissues")
+        parts = HParts(LEVELS) if args.hier else true_parts(); torch.manual_seed(1); np.random.seed(1)
+        tg = f"nested squares {args.hier}" if args.hier else "true tissues"
+        p2 = train(init(1, "fixed"), parts, args.iters2, tag=tg, keep_best=True)
+        v = val_loss(p2, parts); bad = v > 10 * v.median()
+        if bad.any():   # same restart rule as the main runs
+            print(f"  [{tg}] restarting seeds {torch.nonzero(bad).flatten().tolist()}", flush=True)
+            torch.manual_seed(2); np.random.seed(2)
+            p3 = train(init(2, "fixed"), parts, args.iters2, tag=tg + " restart", keep_best=True)
+            v3 = val_loss(p3, parts); use = bad & (v3 < v)
+            for k_ in p2: p2[k_][use] = p3[k_][use]
+            v = torch.where(use, v3, v)
+        r = steering(p2, parts, tg)
         S, E = "search (probe influence, then search)", "encoder (one-shot guess)"
         best = max(100 * r[S][0].mean(), 100 * r["search (each part judged by its own cells)"][0].mean())
-        L = [f"# True parts only ({M} seeds, {DEV})", "",
+        L = [f"# {'Nested squares ' + args.hier if args.hier else 'True parts'} only ({M} seeds, {DEV}); {parts.P} parts", "",
              f"World: side {H}, {N} tissues, {'irregular' if args.irregular else 'square'}, {K} options, {args.rule} rule; "
              f"codes {V}, hidden {HID}, iters2 {args.iters2}, curriculum {args.curriculum}.", "",
              f"- Held-out error per seed: {[round(x, 4) for x in v.tolist()]}",
              f"- Encoder: {100 * r[E][0].mean():.0f}% per seed {[round(100 * float(x)) for x in r[E][0]]}",
              f"- Search (probe influence): {100 * r[S][0].mean():.0f}% per seed {[round(100 * float(x)) for x in r[S][0]]}",
+             f"- Search (own cells): {100 * r['search (each part judged by its own cells)'][0].mean():.0f}% per seed "
+             f"{[round(100 * float(x)) for x in r['search (each part judged by its own cells)'][0]]}",
+             f"- Gradient-tuned codes: {100 * r['gradient-tuned codes'][0].mean():.0f}%",
              f"- Best search {best:.0f}% (validity bar for a full run: 80%)", f"- Total time {time.time() - T0:.0f}s"]
         print("\n".join(L), flush=True); open(f"{args.out}/summary.md", "w").write("\n".join(L) + "\n"); raise SystemExit
 
