@@ -8,6 +8,7 @@ Standing priorities:
 - Keep GPU spend low: smoke-test on CPU first, disconnect the Colab runtime after every run.
 
 ## Doing (at most 3)
+- T-18: Make each square's code mean something locally (random codes during training, error ignored on those squares), then retest search with nested squares. Screen rules fixed in `experiments/6_scale_up/run_local.sh`. Started 2026-11-24.
 - T-17: Nested squares as parts (user's idea). Learns fully (error 0.0003) and one-shot encoder steers 100% on both worlds, but search fails (5–9%; criteria H1/H2 FAIL): codes are used jointly, not locally. [hier](experiments/6_scale_up/results/hier.md). Next: train so each square's code has a local meaning (random or one-at-a-time codes in training), then retest search.
 - T-11: Better part-finding. Averaging copies failed its fixed criterion on held-out worlds (+0.06 vs +0.10 needed) though it helped in 4 of 5; see experiments/7_part_finding/results_development.md. Next idea: a self-check using steering on the training examples.
 - T-16: Fix training with 8 options. Not fixed by 16 codes (7%), longer training (23% at 6000 steps; 20000 steps with a high learning rate peaked at step 4000 and ended at 8%), a bigger network (0%) or a 4-then-8 curriculum (5%); [screen8](experiments/6_scale_up/results/screen8.md), [long8](experiments/6_scale_up/results/long8.md). Points to a design limit. Next to try: more update steps, or several codes per part. Lower priority than T-11.

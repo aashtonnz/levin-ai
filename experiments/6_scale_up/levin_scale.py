@@ -44,6 +44,9 @@ ap.add_argument("--lr-drops", default="0.5,0.8", help="fractions of training whe
 ap.add_argument("--eval-every", type=int, default=0, help="if >0, log encoder accuracy on fixed held-out patterns every N steps")
 ap.add_argument("--hier", default="", help="nested square grids instead of parts, e.g. 3,6 = 3x3 big squares each split "
                 "into 2x2 smaller ones; every cell gets one code per level (true-only mode with these parts)")
+ap.add_argument("--code-noise", type=float, default=0.0, help="training only: each part's code is replaced by a random "
+                "code with this probability, and the error on that part's cells is ignored, so every code must work "
+                "locally whatever its neighbours' codes are")
 ap.add_argument("--phase1-only", action="store_true", help="stop after phase 1 (saves couplings.npz)")
 args = ap.parse_args()
 if args.quick: args.seeds, args.iters1, args.iters2 = 2, 6, 6
@@ -286,7 +289,7 @@ def damage(s, mask):
     return s * (~m)[:, :, None].float()
 
 
-def rollout(p, parts, codes, steps=T, desired=None, dmg_prob=0.0, grad=False, cfix=None):
+def rollout(p, parts, codes, steps=T, desired=None, dmg_prob=0.0, grad=False, cfix=None, wmask=None):
     Mn, B = codes.shape[:2]
     s = torch.zeros(Mn, B, C, H, W, device=DEV); u = parts.field(codes); c = couplings(p, cfix)
     t_d = int(np.random.randint(steps // 2, steps - 15)) if dmg_prob > 0 else -1
@@ -296,7 +299,9 @@ def rollout(p, parts, codes, steps=T, desired=None, dmg_prob=0.0, grad=False, cf
             if t == t_d: s = damage(s, do)
             s = step(p, s, u, c)
             if desired is not None and t >= 30 and t % 5 == 0:
-                loss = loss + ((s[:, :, 0] - desired) ** 2).mean((-1, -2)).mean(1).sum(); n += 1
+                d2 = (s[:, :, 0] - desired) ** 2
+                if wmask is not None: d2 = d2 * wmask / wmask.mean((-1, -2), keepdim=True).clamp(min=1e-3)
+                loss = loss + d2.mean((-1, -2)).mean(1).sum(); n += 1
     return s, (loss / max(n, 1) if desired is not None else None)
 
 
@@ -320,7 +325,13 @@ def train(p, parts, iters, anneal_cost=0.0, cfix=None, tag="", B=16, keep_best=F
         kk = min(K, 4) if args.curriculum and it < iters // 2 else K
         g = torch.randint(0, kk, (M, B, N), device=DEV); tgt = target(g)
         codes = encode(p, parts, tgt, tau=max(0.5, 1.0 - it / iters), noise=False)
-        _, loss = rollout(p, parts, codes, T, tgt, dmg_prob=0.6, grad=True, cfix=cfix)
+        wm = None
+        if args.code_noise > 0:   # random codes on some parts; ignore error on their cells
+            pert = (torch.rand(codes.shape[:3], device=DEV) < args.code_noise) & parts.exists[:, None]
+            rnd = F.one_hot(torch.randint(0, V, codes.shape[:3], device=DEV), V).float()
+            codes = torch.where(pert[..., None], rnd, codes)
+            wm = 1 - torch.einsum("mbp,mphw->mbhw", pert.float(), parts.mask).clamp(max=1)
+        _, loss = rollout(p, parts, codes, T, tgt, dmg_prob=0.6, grad=True, cfix=cfix, wmask=wm)
         ramp = min(1.0, max(0.0, (it / iters - 0.3) / 0.4))                 # 0 until 30%, full by 70%
         cost = anneal_cost * ramp * couplings(p).mean((1, 2, 3)).sum() if "ch" in p else 0.0
         opt.zero_grad(); (loss + cost).backward(); torch.nn.utils.clip_grad_norm_(p.values(), M); opt.step(); sched.step()
@@ -499,7 +510,7 @@ if __name__ == "__main__":
         best = max(100 * r[S][0].mean(), 100 * r["search (each part judged by its own cells)"][0].mean())
         L = [f"# {'Nested squares ' + args.hier if args.hier else 'True parts'} only ({M} seeds, {DEV}); {parts.P} parts", "",
              f"World: side {H}, {N} tissues, {'irregular' if args.irregular else 'square'}, {K} options, {args.rule} rule; "
-             f"codes {V}, hidden {HID}, iters2 {args.iters2}, curriculum {args.curriculum}.", "",
+             f"codes {V}, hidden {HID}, iters2 {args.iters2}, curriculum {args.curriculum}, code noise {args.code_noise}.", "",
              f"- Held-out error per seed: {[round(x, 4) for x in v.tolist()]}",
              f"- Encoder: {100 * r[E][0].mean():.0f}% per seed {[round(100 * float(x)) for x in r[E][0]]}",
              f"- Search (probe influence): {100 * r[S][0].mean():.0f}% per seed {[round(100 * float(x)) for x in r[S][0]]}",
