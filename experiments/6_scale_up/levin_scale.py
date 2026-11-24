@@ -40,6 +40,8 @@ ap.add_argument("--partfinder", choices=["spectral", "mean-of-copies"], default=
 ap.add_argument("--true-only", action="store_true", help="skip phase 1; train and steer with true parts only (fast check)")
 ap.add_argument("--hidden", type=int, default=64, help="hidden units of the per-cell network")
 ap.add_argument("--curriculum", action="store_true", help="train on 4 options for the first half, then all options")
+ap.add_argument("--lr-drops", default="0.5,0.8", help="fractions of training where the learning rate drops to 30%%")
+ap.add_argument("--eval-every", type=int, default=0, help="if >0, log encoder accuracy on fixed held-out patterns every N steps")
 ap.add_argument("--phase1-only", action="store_true", help="stop after phase 1 (saves couplings.npz)")
 args = ap.parse_args()
 if args.quick: args.seeds, args.iters1, args.iters2 = 2, 6, 6
@@ -286,7 +288,7 @@ def val_loss(p, parts, cfix=None):
 def train(p, parts, iters, anneal_cost=0.0, cfix=None, tag="", B=16, keep_best=False):
     opt = torch.optim.Adam(p.values(), lr=3e-3)
     best_v = torch.full((M,), float("inf"), device=DEV); best_p = {k: v.detach().clone() for k, v in p.items()}
-    sched = torch.optim.lr_scheduler.MultiStepLR(opt, [int(iters * 0.5), int(iters * 0.8)], 0.3)
+    sched = torch.optim.lr_scheduler.MultiStepLR(opt, [int(iters * float(f)) for f in args.lr_drops.split(',')], 0.3)
     t0 = time.time()
     for it in range(iters):
         kk = min(K, 4) if args.curriculum and it < iters // 2 else K
@@ -299,6 +301,12 @@ def train(p, parts, iters, anneal_cost=0.0, cfix=None, tag="", B=16, keep_best=F
         if keep_best and (it % 100 == 0 or it == iters - 1) and it > 0:
             v = val_loss(p, parts, cfix); imp = v < best_v; best_v = torch.where(imp, v, best_v)
             for k_ in p: best_p[k_][imp] = p[k_].detach()[imp]
+        if args.eval_every and (it % args.eval_every == 0 or it == iters - 1) and it > 0:
+            with torch.no_grad():
+                st = torch.get_rng_state(); torch.manual_seed(777)
+                gg = torch.randint(0, K, (M, 64, N), device=DEV); tt = target(gg); torch.set_rng_state(st)
+                acc, _ = check(p, parts, encode(p, parts, tt, noise=False), tt, cfix)
+            print(f"  [{tag}] it {it:5d} ACCURACY (encoder, current weights) per seed {[round(100 * float(x)) for x in acc]}", flush=True)
         if it % 200 == 0 or it == iters - 1:
             extra = f" | held-out per seed {[round(x, 4) for x in best_v.tolist()]}" if keep_best and it > 0 else ""
             print(f"  [{tag}] it {it:5d} recon/model {loss.item() / M:.4f} mean coupling "
