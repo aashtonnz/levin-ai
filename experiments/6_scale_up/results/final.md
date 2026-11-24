@@ -36,12 +36,13 @@ fixed meaning, so neighbours really do interact; searching while ignoring intera
 ## Combined world (25 irregular tissues, 8 options, shift rule)
 
 Phase 1 match 0.49 (per seed 0.30–0.62; 8–40 parts). Phase 2: every method 0%, with true and discovered parts alike.
-Validity not met, so no conclusion about part-finding. Cause is the same as the 8-option run; being retested on CPU
-with 16 codes (T-16).
+Validity not met, so no conclusion about part-finding. Cause is the same as the 8-option run; retested with 16 codes:
+still invalid (true parts 7%), see [codes16.md](codes16.md).
 
 ## Overall
 
 - Steering by search scales: 99–100% with true parts on irregular shapes, 25 tissues, and real interactions between
   parts, against 0% for retraining and prompt tuning.
 - Part-finding is the bottleneck: discovered parts give 51% (irregular) and 16% (big).
-- 8 options breaks training; suspected cause is no spare codes. Both runs with 8 options are invalid until fixed.
+- 8 options breaks training. Spare codes (16) did not fix it (true parts 7%); big parts with many options look
+  hard to learn. Both runs with 8 options remain invalid.

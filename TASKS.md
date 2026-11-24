@@ -9,7 +9,7 @@ Standing priorities:
 
 ## Doing (at most 3)
 - T-11: Better part-finding. Averaging copies failed its fixed criterion on held-out worlds (+0.06 vs +0.10 needed) though it helped in 4 of 5; see experiments/7_part_finding/results_development.md. Next idea: a self-check using steering on the training examples.
-- T-16: Fix training with 8 options (codes = options leaves no spare codes). CPU test with 16 codes running; if it trains and true-part steering reaches 80%+, rerun the 8-option and combined conditions on GPU.
+- T-16: Fix training with 8 options. 16 codes did not fix it (true parts 7%, [codes16](experiments/6_scale_up/results/codes16.md)). Clue: small parts learn 8 options well (95–100%), big parts don't. Next: longer training or a curriculum (4 then 8 options), CPU-checked first.
 
 ## Waiting on you
 
