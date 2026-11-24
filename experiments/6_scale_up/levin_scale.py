@@ -37,6 +37,9 @@ ap.add_argument("--rule", choices=["independent", "shift"], default="independent
 ap.add_argument("--world-seed", type=int, default=0)
 ap.add_argument("--partfinder", choices=["spectral", "mean-of-copies"], default="spectral",
                 help="mean-of-copies: average the coupling maps of all trained copies before spectral clustering")
+ap.add_argument("--true-only", action="store_true", help="skip phase 1; train and steer with true parts only (fast check)")
+ap.add_argument("--hidden", type=int, default=64, help="hidden units of the per-cell network")
+ap.add_argument("--curriculum", action="store_true", help="train on 4 options for the first half, then all options")
 ap.add_argument("--phase1-only", action="store_true", help="stop after phase 1 (saves couplings.npz)")
 args = ap.parse_args()
 if args.quick: args.seeds, args.iters1, args.iters2 = 2, 6, 6
@@ -44,7 +47,7 @@ if args.quick: args.seeds, args.iters1, args.iters2 = 2, 6, 6
 DEV = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 K, N, H = args.options, args.tissues, args.side
 W = H
-C, HID, M, V = 12, 64, args.seeds, max(args.codes, args.options)
+C, HID, M, V = 12, args.hidden, args.seeds, max(args.codes, args.options)
 GRID = max(2, round(H / 3))                      # misaligned grid for phase 1: parts of about 3x3 cells
 NOISE, COMMIT, T = 0.02, 0.02, 80
 
@@ -286,7 +289,8 @@ def train(p, parts, iters, anneal_cost=0.0, cfix=None, tag="", B=16, keep_best=F
     sched = torch.optim.lr_scheduler.MultiStepLR(opt, [int(iters * 0.5), int(iters * 0.8)], 0.3)
     t0 = time.time()
     for it in range(iters):
-        g = torch.randint(0, K, (M, B, N), device=DEV); tgt = target(g)
+        kk = min(K, 4) if args.curriculum and it < iters // 2 else K
+        g = torch.randint(0, kk, (M, B, N), device=DEV); tgt = target(g)
         codes = encode(p, parts, tgt, tau=max(0.5, 1.0 - it / iters), noise=False)
         _, loss = rollout(p, parts, codes, T, tgt, dmg_prob=0.6, grad=True, cfix=cfix)
         ramp = min(1.0, max(0.0, (it / iters - 0.3) / 0.4))                 # 0 until 30%, full by 70%
@@ -443,6 +447,21 @@ if __name__ == "__main__":
     T0 = time.time(); os.makedirs(args.out, exist_ok=True)
     print(f"device {DEV} | hidden 3x3 tissues (independent rule) | {M} seeds", flush=True)
     torch.manual_seed(0); np.random.seed(0)
+
+    if args.true_only:
+        parts = true_parts(); torch.manual_seed(1); np.random.seed(1)
+        p2 = train(init(1, "fixed"), parts, args.iters2, tag="true tissues", keep_best=True)
+        v = val_loss(p2, parts); r = steering(p2, parts, "true tissues")
+        S, E = "search (probe influence, then search)", "encoder (one-shot guess)"
+        best = max(100 * r[S][0].mean(), 100 * r["search (each part judged by its own cells)"][0].mean())
+        L = [f"# True parts only ({M} seeds, {DEV})", "",
+             f"World: side {H}, {N} tissues, {'irregular' if args.irregular else 'square'}, {K} options, {args.rule} rule; "
+             f"codes {V}, hidden {HID}, iters2 {args.iters2}, curriculum {args.curriculum}.", "",
+             f"- Held-out error per seed: {[round(x, 4) for x in v.tolist()]}",
+             f"- Encoder: {100 * r[E][0].mean():.0f}% per seed {[round(100 * float(x)) for x in r[E][0]]}",
+             f"- Search (probe influence): {100 * r[S][0].mean():.0f}% per seed {[round(100 * float(x)) for x in r[S][0]]}",
+             f"- Best search {best:.0f}% (validity bar for a full run: 80%)", f"- Total time {time.time() - T0:.0f}s"]
+        print("\n".join(L), flush=True); open(f"{args.out}/summary.md", "w").write("\n".join(L) + "\n"); raise SystemExit
 
     print("PHASE 1: learn coupling (annealed cost) through a misaligned 5x5 grid", flush=True)
     grid = grid_parts()
