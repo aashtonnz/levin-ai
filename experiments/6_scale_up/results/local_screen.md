@@ -20,3 +20,17 @@ Rule fixed before running: pass if best search >= 80% (mean of 2 seeds) and enco
   code wipes out the loss over a large area, so there is little signal).
 - Follow-up screen (run_local2.sh): small squares with more noise and longer training, to see if search passes 80%
   while the encoder recovers.
+
+## Follow-up screen (small squares only, 2 seeds, world 0)
+
+| Variant | Held-out error | Encoder | Search (probe influence) | Search (own cells) | Screen |
+|---|---|---|---|---|---|
+| noise 0.6, 5000 steps | 0.0015, 0.0010 | 88% [91, 84] | 47% [72, 22] | 56% [44, 69] | FAIL |
+| noise 0.8, 2000 steps | (not read) | 2% [3, 0] | 2% [3, 0] | 6% [12, 0] | FAIL |
+| noise 0.8, 5000 steps | 0.008, 0.0041 | 28% [28, 28] | 19% [6, 31] | 20% [3, 38] | FAIL |
+
+Reading: no variant passes. Noise around 0.6 is the best tried (search 56–75% across two runs, single seeds from
+22% to 88%); 0.8 is too much (the model barely learns). Longer training at 0.6 did not help search. Seed-to-seed
+spread is large, so 2-seed screens are only a rough guide here. Random codes move search from 4% to roughly
+50–75% but not reliably to 80%. Next ideas: randomise only one or two squares per example (gentler than a fixed
+rate), or train with the search procedure itself in the loop.
