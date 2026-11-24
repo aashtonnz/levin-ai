@@ -15,6 +15,7 @@ a passing variant then gets a full 8-seed run before any claim.
 ## Reading
 
 - None of the three fixes pass. Longer training helps a little (one seed reaches 34–38%) but is far from 80%.
+  A follow-up 20000-step run ([long8.md](long8.md)) peaked at step 4000 and did not improve after: not a training-time limit.
 - A bigger per-cell network does not help, so capacity of the cell network is not the limit.
 - Mean error can be low while patterns still fail: a pattern counts only if all 9 tissues are under 0.02 at once.
 - Next hypothesis (untested): too few update steps for one code to draw 8 different patterns across a 5x5 part, or
