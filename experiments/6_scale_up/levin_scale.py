@@ -47,6 +47,8 @@ ap.add_argument("--hier", default="", help="nested square grids instead of parts
 ap.add_argument("--code-noise", type=float, default=0.0, help="training only: each part's code is replaced by a random "
                 "code with this probability, and the error on that part's cells is ignored, so every code must work "
                 "locally whatever its neighbours' codes are")
+ap.add_argument("--code-noise-k", type=int, default=0, help="training only: randomise exactly this many parts' codes per "
+                "example (gentler alternative to --code-noise), ignoring the error on their cells")
 ap.add_argument("--phase1-only", action="store_true", help="stop after phase 1 (saves couplings.npz)")
 args = ap.parse_args()
 if args.quick: args.seeds, args.iters1, args.iters2 = 2, 6, 6
@@ -326,8 +328,13 @@ def train(p, parts, iters, anneal_cost=0.0, cfix=None, tag="", B=16, keep_best=F
         g = torch.randint(0, kk, (M, B, N), device=DEV); tgt = target(g)
         codes = encode(p, parts, tgt, tau=max(0.5, 1.0 - it / iters), noise=False)
         wm = None
-        if args.code_noise > 0:   # random codes on some parts; ignore error on their cells
-            pert = (torch.rand(codes.shape[:3], device=DEV) < args.code_noise) & parts.exists[:, None]
+        if args.code_noise > 0 or args.code_noise_k > 0:   # random codes on some parts; ignore error on their cells
+            if args.code_noise_k > 0:
+                sc = torch.rand(codes.shape[:3], device=DEV).masked_fill(~parts.exists[:, None], -1.0)
+                pert = torch.zeros(codes.shape[:3], dtype=torch.bool, device=DEV)
+                pert.scatter_(2, sc.topk(args.code_noise_k, -1).indices, True)
+            else:
+                pert = (torch.rand(codes.shape[:3], device=DEV) < args.code_noise) & parts.exists[:, None]
             rnd = F.one_hot(torch.randint(0, V, codes.shape[:3], device=DEV), V).float()
             codes = torch.where(pert[..., None], rnd, codes)
             wm = 1 - torch.einsum("mbp,mphw->mbhw", pert.float(), parts.mask).clamp(max=1)
@@ -510,7 +517,7 @@ if __name__ == "__main__":
         best = max(100 * r[S][0].mean(), 100 * r["search (each part judged by its own cells)"][0].mean())
         L = [f"# {'Nested squares ' + args.hier if args.hier else 'True parts'} only ({M} seeds, {DEV}); {parts.P} parts", "",
              f"World: side {H}, {N} tissues, {'irregular' if args.irregular else 'square'}, {K} options, {args.rule} rule; "
-             f"codes {V}, hidden {HID}, iters2 {args.iters2}, curriculum {args.curriculum}, code noise {args.code_noise}.", "",
+             f"codes {V}, hidden {HID}, iters2 {args.iters2}, curriculum {args.curriculum}, code noise {args.code_noise}, k {args.code_noise_k}.", "",
              f"- Held-out error per seed: {[round(x, 4) for x in v.tolist()]}",
              f"- Encoder: {100 * r[E][0].mean():.0f}% per seed {[round(100 * float(x)) for x in r[E][0]]}",
              f"- Search (probe influence): {100 * r[S][0].mean():.0f}% per seed {[round(100 * float(x)) for x in r[S][0]]}",
